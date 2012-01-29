@@ -1,0 +1,20 @@
+txn[1003], 15:45:43.796, select q.id as c0, q.title as c1  from questions q where q.id = ?   
+txn[1003], 15:45:43.812, FindBean type[Question] origin[CWDRLz.BpqqI2.BvQvWT] exeMicros[8158] rows[0] bind[1] 
+txn[1004], 15:46:16.812, select q.id as c0, q.title as c1  from questions q where q.id = ?   
+txn[1004], 15:46:16.828, FindBean type[Question] origin[CWDRLz.BpqqI2.BvQvWT] exeMicros[17057] rows[1] bind[1] 
+txn[1003], 15:47:18.406, select q.id as c0, q.title as c1  from questions q 
+txn[1003], 15:47:18.421, FindMany type[Question] origin[CWDRLz.BpqqI3.BvQvWT] exeMicros[6846] rows[0] name[] predicates[] bind[] 
+txn[1004], 15:47:24.406, select q.id as c0, q.title as c1  from questions q where q.id = ?   
+txn[1004], 15:47:24.406, FindBean type[Question] origin[CWDRLz.BpqqI2.BvQvWT] exeMicros[5311] rows[0] bind[1] 
+txn[1001], 15:48:20.375, select q.id as c0, q.title as c1  from questions q where q.id = ?   
+txn[1001], 15:48:20.406, FindBean type[Question] origin[CWDRLz.BpqqI2.BvQvWT] exeMicros[28729] rows[1] bind[1] 
+txn[1001], 15:48:42.078, select q.id as c0, q.title as c1  from questions q where q.id = ?   
+txn[1001], 15:48:42.078, FindBean type[Question] origin[CWDRLz.BpqqI2.BvQvWT] exeMicros[2372] rows[1] bind[1] 
+txn[1002], 15:48:50.312, select q.id as c0, q.title as c1  from questions q where q.id = ?   
+txn[1002], 15:48:50.312, FindBean type[Question] origin[CWDRLz.BpqqI2.BvQvWT] exeMicros[1097] rows[1] bind[1] 
+txn[1001], 15:49:04.218, select q.id as c0, q.title as c1  from questions q where q.id = ?   
+txn[1001], 15:49:04.250, FindBean type[Question] tuned[true] origin[CWDRLz.BpqqI2.BvQvWT] exeMicros[28401] rows[1] bind[1] 
+txn[1002], 15:49:10.718, select q.id as c0, q.title as c1  from questions q where q.id = ?   
+txn[1002], 15:49:10.718, FindBean type[Question] tuned[true] origin[CWDRLz.BpqqI2.BvQvWT] exeMicros[5871] rows[1] bind[1] 
+txn[1003], 15:49:22.125, select q.id as c0, q.title as c1  from questions q where q.id = ?   
+txn[1004], 15:49:27.968, select q.id as c0, q.title as c1  from questions q where q.id = ?   

@@ -1,0 +1,8 @@
+txn[1001], 18:47:00.078, select q.id c0, q.title c1  from questions q where q.id = ?   
+txn[1003], 18:47:55.750, select q.id c0, q.title c1  from questions q where q.id = ?   
+txn[1003], 18:47:55.781, FindBean type[Question] origin[CWDRLz.BpqqI2.BvQvWT] exeMicros[22480] rows[0] bind[1] 
+txn[1003], 18:49:13.750, insert into questions (title) values (?) 
+txn[1003], 18:49:13.750, Binding Insert [questions]  set[title=÷’”⁄∏„∂®, ] 
+txn[1003], 18:49:13.750, Inserted [Question] [0] 
+txn[1004], 18:49:13.750, select q.id c0, q.title c1  from questions q where q.id = ?   
+txn[1004], 18:49:13.750, FindBean type[Question] origin[CWDRL2.BpqqI2.BvQvWT] exeMicros[5185] rows[1] bind[0] 
