@@ -2,75 +2,48 @@ package play.modules.ebean;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.annotation.Annotation;
 import java.lang.instrument.ClassFileTransformer;
-import java.util.Map;
-
+import java.util.HashSet;
+import java.util.Set;
 import javassist.CtClass;
-import javassist.CtConstructor;
 import javassist.CtField;
 import javassist.CtMethod;
-import javassist.CtNewConstructor;
 import javassist.bytecode.AnnotationsAttribute;
-import javassist.bytecode.annotation.MemberValue;
+import javax.persistence.Embeddable;
+import javax.persistence.Entity;
 import javax.persistence.PrePersist;
 
-import org.apache.commons.lang.ArrayUtils;
+import org.apache.commons.io.IOUtils;
 
 import play.Logger;
 import play.Play;
 import play.classloading.ApplicationClasses.ApplicationClass;
 import play.classloading.enhancers.Enhancer;
-import play.exceptions.UnexpectedException;
 
 import com.avaje.ebean.enhance.agent.ClassBytesReader;
 import com.avaje.ebean.enhance.agent.InputStreamTransform;
+import com.avaje.ebean.enhance.agent.Transformer;
+import com.avaje.ebean.enhance.asm.ClassReader;
+import com.avaje.ebean.enhance.asm.ClassWriter;
 
 public class EbeanEnhancer extends Enhancer {
 
-	static ClassFileTransformer transformer = new PlayAwareTransformer(new PlayClassBytesReader(),
-			"transientInternalFields=true;debug=0");
+	static ClassFileTransformer transformer = new PlayAwareTransformer(new PlayClassBytesReader(), "transientInternalFields=true;debug=0");
 
 	public void enhanceThisClass(ApplicationClass applicationClass) throws Exception {
-		// Ebean transformations
-		byte[] buffer = transformer.transform(Play.classloader, applicationClass.name, null, null,
-				applicationClass.enhancedByteCode);
-		if (buffer != null)
-			applicationClass.enhancedByteCode = buffer;
-
 		CtClass ctClass = makeClass(applicationClass);
-
-		if (!ctClass.subtypeOf(classPool.get("play.modules.ebean.EbeanSupport"))) {
-			// We don't want play style enhancements to happen or classes other
-			// than subclasses of EbeanSupport
+		if (!ctClass.subtypeOf(classPool.get(Model.class.getName()))
+				|| !hasAnnotation(ctClass, Entity.class.getName()) && !hasAnnotation(ctClass, Embeddable.class.getName())) {
 			return;
 		}
 
-		// Enhance only JPA entities
-		if (!hasAnnotation(ctClass, "javax.persistence.Entity")) {
-			return;
+		// Ebean transformations
+		byte[] buffer = transformer.transform(Play.classloader, applicationClass.name, null, null, applicationClass.enhancedByteCode);
+		if (buffer != null) {
+			applicationClass.enhancedByteCode = buffer;
 		}
 
-		String entityName = ctClass.getName();
-
-		// Add a default constructor if needed
-		try {
-			boolean hasDefaultConstructor = false;
-			for (CtConstructor constructor : ctClass.getConstructors()) {
-				if (constructor.getParameterTypes().length == 0) {
-					hasDefaultConstructor = true;
-					break;
-				}
-			}
-			if (!hasDefaultConstructor && !ctClass.isInterface()) {
-				CtConstructor defaultConstructor = CtNewConstructor.make(
-						"private " + ctClass.getSimpleName() + "() {}", ctClass);
-				ctClass.addConstructor(defaultConstructor);
-			}
-		} catch (Exception e) {
-			Logger.error(e, "Error in EbeanEnhancer");
-			throw new UnexpectedException("Error in EbeanEnhancer", e);
-		}
+		ctClass = makeClass(applicationClass);
 
 		// @UUID
 		CtField id = getUuidField(ctClass);
@@ -85,34 +58,10 @@ public class EbeanEnhancer extends Enhancer {
 			ctClass.addMethod(setUUIDMethod);
 		}
 
-//		// query
-//		String query = "public static play.modules.ebean.EbeanQuery query() {"
-//				+ " return new play.modules.ebean.EbeanQuery( ebean().createQuery(" + entityName
-//				+ ".class)); }";
-//		ctClass.addMethod(CtMethod.make(query, ctClass));
-
-		// findById
-		String findById = "public static play.modules.ebean.EbeanSupport findById(Object id) { return ("
-				+ entityName + ") ebean().find(" + entityName + ".class, id); }";
-
-		ctClass.addMethod(CtMethod.make(findById, ctClass));
-
-		// get
-		String get = "public static play.modules.ebean.EbeanSupport get(Object id) {"
-				+ " return (" + entityName + ")ebean().find(" + entityName + ".class, id); }";
-		ctClass.addMethod(CtMethod.make(get, ctClass));
-
 		// Done.
 		applicationClass.enhancedByteCode = ctClass.toBytecode();
 		ctClass.defrost();
-
-	}
-
-	private void createAnnotation(CtMethod ctMethod, Class<PrePersist> annotationType) {
-		AnnotationsAttribute annotationsAttribute = getAnnotations(ctMethod);
-		javassist.bytecode.annotation.Annotation annotation = new javassist.bytecode.annotation.Annotation(
-				annotationType.getName(), annotationsAttribute.getConstPool());
-		annotationsAttribute.addAnnotation(annotation);
+		Logger.debug("EBEAN: Class '%s' has been enhanced", ctClass.getName());
 	}
 
 	private CtField getUuidField(CtClass ctClass) {
@@ -127,7 +76,14 @@ public class EbeanEnhancer extends Enhancer {
 		return null;
 	}
 
-	static class PlayClassBytesReader implements ClassBytesReader {
+	private void createAnnotation(CtMethod ctMethod, Class<PrePersist> annotationType) {
+		AnnotationsAttribute annotationsAttribute = getAnnotations(ctMethod);
+		javassist.bytecode.annotation.Annotation annotation = new javassist.bytecode.annotation.Annotation(
+			annotationType.getName(), annotationsAttribute.getConstPool());
+		annotationsAttribute.addAnnotation(annotation);
+	}
+
+	private static class PlayClassBytesReader implements ClassBytesReader {
 
 		public byte[] getClassBytes(String className, ClassLoader classLoader) {
 			ApplicationClass ac = Play.classes.getApplicationClass(className.replace("/", "."));
@@ -136,22 +92,71 @@ public class EbeanEnhancer extends Enhancer {
 
 		private byte[] getBytesFromClassPath(String className) {
 			String resource = className + ".class";
-			byte[] classBytes = null;
 			InputStream is = Play.classloader.getResourceAsStream(resource);
+			if (is == null) {
+				throw new RuntimeException("Class file not found: " + resource);
+			}
+
 			try {
-				classBytes = InputStreamTransform.readBytes(is);
+				return InputStreamTransform.readBytes(is);
 			} catch (IOException e) {
 				throw new RuntimeException("IOException reading bytes for " + className, e);
 			} finally {
-				if (is != null) {
-					try {
-						is.close();
-					} catch (IOException e) {
-						throw new RuntimeException("Error closing InputStream for " + className, e);
-					}
-				}
+				IOUtils.closeQuietly(is);
 			}
-			return classBytes;
+		}
+
+	}
+
+	static class PlayAwareTransformer extends Transformer {
+
+		public PlayAwareTransformer(ClassBytesReader r, String agentArgs) {
+			super(r, agentArgs);
+		}
+
+		@Override
+		protected ClassWriter createClassWriter() {
+			return new PlayAwareClassWriter();
+
+		}
+	}
+
+	static class PlayAwareClassWriter extends ClassWriter {
+
+		public PlayAwareClassWriter() {
+			super(COMPUTE_FRAMES + COMPUTE_MAXS);
+		}
+
+		@Override
+		protected String getCommonSuperClass(String type1, String type2) {
+			try {
+				// First put all super classes of type1, including type1 (starting with type2 is equivalent)
+				Set<String> superTypes1 = new HashSet<String>();
+				String s = type1;
+				superTypes1.add(s);
+				while (!"java/lang/Object".equals(s)) {
+					s = getSuperType(s);
+					superTypes1.add(s);
+				}
+				// Then check type2 and each of it's super classes in sequence if it is in the set
+				// First match is the common superclass.
+				s = type2;
+				while (true) {
+					if (superTypes1.contains(s)) return s;
+					s = getSuperType(s);
+				}
+			} catch (Exception e) {
+				throw new RuntimeException(e.toString());
+			}
+		}
+
+		private String getSuperType(String type) throws ClassNotFoundException {
+			ApplicationClass ac = Play.classes.getApplicationClass(type.replace('/', '.'));
+			try {
+				return ac != null ? new ClassReader(ac.enhancedByteCode).getSuperName() : new ClassReader(type).getSuperName();
+			} catch (IOException e) {
+				throw new ClassNotFoundException(type);
+			}
 		}
 
 	}
